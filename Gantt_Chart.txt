@@ -1,0 +1,506 @@
+///html
+
+
+<h1>Gantt Chart Test</h1>
+
+
+<div id = "container">
+  <div class = "svg" #chart></div>
+  <div id = "tag"></div>
+  </div>
+
+
+
+//css
+
+p {
+    font-family: Lato;
+  }
+  
+  * {
+        margin: 0;
+        padding: 0;
+    }
+  body {
+        background: #fff;
+        font-family: 'Open-Sans',sans-serif;
+  
+  }
+  
+  #container{
+    margin: 0 auto;
+    position: relative;
+    width:800px;
+    overflow: visible;
+  }
+  
+  
+  .svg {
+      width:800px;
+      height:400px;
+      overflow: visible;
+      position:absolute;
+  }
+  
+  .grid .tick {
+      stroke: lightgrey;
+      opacity: 0.3;
+      shape-rendering: crispEdges;
+  }
+  .grid path {
+        stroke-width: 0;
+  }
+  
+  
+  #tag {
+    color: #000;
+    background: #FFF;
+    width: 150px;
+    position: absolute;
+    display: none;
+    padding:3px 6px;
+    margin-left: -80px;
+    font-size: 11px;
+  }
+  
+  
+  
+  #tag:before {
+    border: solid transparent;
+    content: ' ';
+    height: 0;
+    left: 50%;
+    margin-left: -5px;
+    position: absolute;
+    width: 0;
+    border-width: 10px;
+    border-bottom-color: #FFF;
+    top: -20px;
+  }
+
+
+
+
+
+
+//.ts
+
+
+
+
+import { Component } from '@angular/core';
+import * as d3 from 'd3';
+
+@Component({
+  selector: 'app-root',
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.css'],
+})
+export class AppComponent {
+  svg: any;
+  categories: any;
+  dateFormat: any;
+  timeScale: any;
+  catsUnfiltered: any;
+  taskArray: any;
+  w: any;
+  h: any;
+  element: any;
+
+  constructor() {}
+
+  ngOnInit() {
+    this.createChart();
+  }
+
+  createChart() {
+    this.element = document.querySelector('.svg');
+    this.w = 1000;
+    this.h = 200; //Change
+
+    this.svg = d3
+      .select(this.element)
+      .append('svg')
+      .attr('width', this.w)
+      .attr('height', this.h)
+      .attr('class', 'svg');
+
+    this.taskArray = [
+      {
+        type: 'Development',
+        startTime: '2013-1-28',
+        endTime: '2013-2-1',
+        status: 'GREEN',
+      },
+
+      {
+        type: 'Development',
+        startTime: '2013-2-1',
+        endTime: '2013-2-6',
+        status: 'GREEN',
+      },
+
+      {
+        type: 'Development',
+        startTime: '2013-2-6',
+        endTime: '2013-2-9',
+        status: 'RED',
+      },
+
+      {
+        type: 'Development',
+        startTime: '2013-2-6',
+        endTime: '2013-2-9',
+        status: 'GREEN',
+      },
+
+      {
+        type: 'Coding',
+        startTime: '2013-2-2',
+        endTime: '2013-2-6',
+        status: 'RED',
+      },
+
+      {
+        type: 'Coding',
+        startTime: '2013-2-6',
+        endTime: '2013-2-9',
+        status: 'GREEN',
+      },
+
+      {
+        type: 'Promotion',
+        startTime: '2013-2-9',
+        endTime: '2013-2-12',
+        status: 'RED',
+      },
+
+      {
+        type: 'Promotion',
+        startTime: '2013-2-12',
+        endTime: '2013-2-14',
+        status: 'GREEN',
+      },
+      {
+        type: 'Celebration',
+        startTime: '2013-2-8',
+        endTime: '2013-2-13',
+        status: 'GREEN',
+      },
+      {
+        type: 'Celebration',
+        startTime: '2013-2-13',
+        endTime: '2013-2-16',
+        status: 'RED',
+      },
+      {
+        type: 'Celebration',
+        startTime: '2013-2-1',
+        endTime: '2013-2-13',
+        status: 'VIOLET',
+      },
+      {
+        type: 'Celebration',
+        startTime: '2013-2-12',
+        endTime: '2013-2-18',
+        status: 'BLUE',
+      },
+    ];
+
+    this.dateFormat = d3.timeParse('%Y-%m-%d');
+
+    this.timeScale = d3
+      .scaleTime()
+      .domain([new Date('2013-01-27'), new Date('2013-02-19')])
+      .range([0, this.w - 180]); //Change
+
+    this.categories = new Array();
+
+    for (var i = 0; i < this.taskArray.length; i++) {
+      this.categories.push(this.taskArray[i].type);
+    }
+
+    this.catsUnfiltered = this.categories;
+
+    this.categories = this.checkUnique(this.categories);
+
+    this.makeGant(this.taskArray, this.w, this.h);
+  }
+
+  makeGant(tasks, pageWidth, pageHeight) {
+    console.log('makeGant');
+
+    var barHeight = 8; // Change
+    var gap = barHeight + 3;
+    var topPadding = 15;
+    var sidePadding = 100; // Change
+
+    var colorScale = d3
+      .scaleLinear(['#00B9FA', '#F95002'])
+      .domain([0, this.categories.length])
+      .interpolate(d3.interpolateHcl);
+
+    this.makeGrid(sidePadding, topPadding, pageWidth, pageHeight);
+    this.drawRects(
+      tasks,
+      gap,
+      topPadding,
+      sidePadding,
+      barHeight,
+      colorScale,
+      pageWidth,
+      pageHeight
+    );
+    this.vertLabels(gap, topPadding, sidePadding, barHeight, colorScale);
+  }
+
+  makeGrid(theSidePad, theTopPad, w, h) {
+    console.log('makeGrid');
+    var xAxis = d3
+      .axisBottom(this.timeScale)
+      .ticks(d3.timeDay)
+      .tickSize(-h + theTopPad + 20)
+      .tickSizeOuter(0)
+      .tickFormat(d3.timeFormat('%d %b'));
+
+    var grid = this.svg
+      .append('g')
+      .attr('class', 'grid')
+      .attr('transform', 'translate(' + theSidePad + ', ' + (h - 50) + ')')
+      .call(xAxis)
+      .selectAll('text')
+      .style('text-anchor', 'middle')
+      .attr('fill', 'grey')
+      .attr('stroke', 'none')
+      .attr('font-size', 10)
+      .attr('dy', '1em');
+  }
+
+  drawRects(
+    theArray,
+    theGap,
+    theTopPad,
+    theSidePad,
+    theBarHeight,
+    theColorScale,
+    w,
+    h
+  ) {
+    console.log('drawRects');
+    var bigRects = this.svg
+      .append('g')
+      .selectAll('rect')
+      .data(theArray)
+      .enter()
+      .append('rect')
+      .attr('x', 0)
+      .attr('y', (d, i) => {
+        return i * theGap + theTopPad - 2;
+      })
+      .attr('width', (d) => {
+        return this.w - theSidePad / 2;
+      })
+      .attr('height', theGap)
+      .attr('stroke', 'none')
+      .attr('fill', (d) => {
+        for (var i = 0; i < this.categories.length; i++) {
+          if (d.type == this.categories[i]) {
+            if (i % 2 == 0) {
+              return '#BDBDBD';
+            }
+            //return d3.rgb(theColorScale(i));
+          }
+        }
+      })
+      .attr('opacity', 0.2);
+
+    var rectangles = this.svg
+      .append('g')
+      .selectAll('rect')
+      .data(theArray)
+      .enter();
+
+    var innerRects = rectangles
+      .append('rect')
+      .attr('rx', 3)
+      .attr('ry', 3)
+      .attr('x', (d) => {
+        return this.timeScale(this.dateFormat(d.startTime)) + theSidePad;
+      })
+      .attr('y', (d, i) => {
+        return i * theGap + theTopPad;
+      })
+      .attr('width', (d) => {
+        return (
+          this.timeScale(this.dateFormat(d.endTime)) -
+          this.timeScale(this.dateFormat(d.startTime))
+        );
+      })
+      .attr('height', theBarHeight)
+      .attr('stroke', 'none')
+      .attr('fill', (d) => {
+        for (var i = 0; i < this.categories.length; i++) {
+          if (d.type == this.categories[i]) {
+            return d.status; //d3.rgb(theColorScale(i));
+          }
+        }
+      });
+
+    // innerRects.on('mouseover', (e, index, array) => {
+
+    //   console.log('innerRects on mouseover');
+    //   //console.log(this);
+    //   var tag = "";
+    //   //console.log(e);
+    //   if (e.details != undefined) {
+    //     tag = "Task: " + e.task + "<br/>" +
+    //       "Type: " + e.type + "<br/>" +
+    //       "Starts: " + e.startTime + "<br/>" +
+    //       "Ends: " + e.endTime + "<br/>" +
+    //       "Details: " + e.details;
+    //   } else {
+    //     tag = "Task: " + e.task + "<br/>" +
+    //       "Type: " + e.type + "<br/>" +
+    //       "Starts: " + e.startTime + "<br/>" +
+    //       "Ends: " + e.endTime;
+    //   }
+    //   var output = document.getElementById("tag");
+    //   //console.log(array[index]);
+    //   var x = this.timeScale(this.dateFormat(e.startTime)) + theSidePad + ((this.timeScale(this.dateFormat(e.endTime)) - this.timeScale(this.dateFormat(e.startTime)))/2) + "px";
+    //   var y = index * theGap + theTopPad + 25 + "px";
+    //   output.innerHTML = tag;
+    //   output.style.top = y;
+    //   output.style.left = x;
+    //   output.style.display = "block";
+    // }).on('mouseout', () => {
+    //   var output = document.getElementById("tag");
+    //   output.style.display = "none";
+
+    // });
+
+    var rectText = rectangles
+      .append('text')
+      // .text((d) => {
+      //   return d.task;
+      // })
+      .attr('x', (d) => {
+        return (
+          (this.timeScale(this.dateFormat(d.endTime)) -
+            this.timeScale(this.dateFormat(d.startTime))) /
+            2 +
+          this.timeScale(this.dateFormat(d.startTime)) +
+          theSidePad
+        );
+      })
+      .attr('y', (d, i) => {
+        return i * theGap + 14 + theTopPad;
+      });
+    // .attr("font-size", 4)
+    // .attr("text-anchor", "middle")
+    // .attr("text-height", theBarHeight)
+    // .attr("fill", "#fff");
+
+    // rectText.on('mouseover', (e,index) => {
+    //   console.log('rectText on mouseover');
+    //   // console.log(this.x.animVal.getItem(this));
+    //   var tag = "";
+
+    //   if (e.details != undefined) {
+    //     tag = "Task: " + e.task + "<br/>" +
+    //       "Type: " + e.type + "<br/>" +
+    //       "Starts: " + e.startTime + "<br/>" +
+    //       "Ends: " + e.endTime + "<br/>" +
+    //       "Details: " + e.details;
+    //   } else {
+    //     tag = "Task: " + e.task + "<br/>" +
+    //       "Type: " + e.type + "<br/>" +
+    //       "Starts: " + e.startTime + "<br/>" +
+    //       "Ends: " + e.endTime;
+    //   }
+    //   var output = document.getElementById("tag");
+
+    //   var x = (this.timeScale(this.dateFormat(e.endTime)) - this.timeScale(this.dateFormat(e.startTime))) / 2 + this.timeScale(this.dateFormat(e.startTime)) + theSidePad + "px";
+    //   var y = index * theGap + 14 + theTopPad + 25 + "px";
+    //   output.innerHTML = tag;
+    //   output.style.top = y;
+    //   output.style.left = x;
+    //   output.style.display = "block";
+    // }).on('mouseout', () => {
+    //   var output = document.getElementById("tag");
+    //   output.style.display = "none";
+    // });
+  }
+
+  vertLabels(theGap, theTopPad, theSidePad, theBarHeight, theColorScale) {
+    console.log('vertLabels');
+    var numOccurances = new Array();
+    var prevGap = 0;
+
+    for (var i = 0; i < this.categories.length; i++) {
+      numOccurances[i] = [
+        this.categories[i],
+        this.getCount(this.categories[i], this.catsUnfiltered),
+      ];
+    }
+    //console.log(numOccurances);
+    var axisText = this.svg
+      .append('g') //without doing this, impossible to put grid lines behind text
+      .selectAll('text')
+      .data(numOccurances)
+      .enter()
+      .append('text')
+      .text((d) => {
+        return d[0];
+      })
+      .attr('x', 10)
+      .attr('y', (d, i) => {
+        if (i > 0) {
+          for (var j = 0; j < i; j++) {
+            prevGap += numOccurances[i - 1][1];
+            // console.log(prevGap);
+            return (d[1] * theGap) / 2 + prevGap * theGap + theTopPad;
+          }
+        } else {
+          return (d[1] * theGap) / 2 + theTopPad;
+        }
+      })
+      .attr('font-size', 11)
+      .attr('text-anchor', 'start')
+      .attr('text-height', 14)
+      .attr('fill', (d) => {
+        for (var i = 0; i < this.categories.length; i++) {
+          if (d[0] == this.categories[i]) {
+            //  console.log("true!");
+            return '#000'; //d3.rgb(theColorScale(i)).darker();
+          }
+        }
+      });
+  }
+
+  checkUnique(arr) {
+    console.log('checkUnique');
+    var hash = {},
+      result = [];
+    for (var i = 0, l = arr.length; i < l; ++i) {
+      if (!hash.hasOwnProperty(arr[i])) {
+        //it works with objects! in FF, at least
+        hash[arr[i]] = true;
+        result.push(arr[i]);
+      }
+    }
+    return result;
+  }
+
+  getCounts(arr) {
+    console.log('getCounts');
+    var i = arr.length, // var to loop over
+      obj = {}; // obj to store results
+    while (i) obj[arr[--i]] = (obj[arr[i]] || 0) + 1; // count occurrences
+    return obj;
+  }
+
+  getCount(word, arr) {
+    console.log('getCount');
+    return this.getCounts(arr)[word] || 0;
+  }
+}
